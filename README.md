@@ -66,9 +66,12 @@ In a folder containing a file `hydefile`:
 * `hyde` performs once the forward pipeline computation and writes the output files.
 * `hyde --backward` performs once the forward pipeline computation, compare with the existing outputs, and writes the *input* files.
   It might ask a question if it finds ambiguity. To auto-resolve ambiguities, just add the "--autosync" option.
-* `hyde --watch`
-* `hyde tasks` computes the pipeline and displays the top-level list of tasks.
-* `hyde tasks module[.submodule]` computes the pipeline and displays all the tasks that are under `module` (or the submodule)
+* `hyde --watch` watches the inputs and the outputs, propagating one to the other.
+* `hyde --watch --forward` watches the inputs and updates the outputs only.
+* `hyde resolve` or `hyde resolve _`computes the pipeline and displays the top-level list of tasks.
+* `hyde resolve module` or `hyde resolve module._` displays all the tasks that are under `module`
+* `hyde resolve m_` displays all the tasks that start with `m`
+* `hyde resolve moduel.sub_` displays all the tasks in `module` that start with `sub`
 
 
 
