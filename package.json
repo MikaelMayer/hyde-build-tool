@@ -1,23 +1,24 @@
 {
   "name": "hyde-build-tool",
   "version": "1.0.0",
-  "description": "The sketch-n-sketch website",
+  "description": "The Hyde Build Tool is an experimental reversible build tool, that it, it can modify the input sources",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "bidirectional",
-    "web"
+    "build tool",
+    "pipeline",
+    "reversible",
+    "make",
+    "jekyll"
   ],
-  "homepage": "http://ravichugh.github.io/sketch-n-sketch/",
-  "bugs": "https://github.com/RaviChugh/Sketch-n-Sketch/issues",
-  "author": "Ravi Chugh <rchugh@uchicago.edu>",
-  "contributors": [
-    "Mikael Mayer <mikael.mayer@polytechnique.org>"
-  ],
+  "homepage": "https://github.com/MikaelMayer/hyde-build-tool",
+  "bugs": "https://github.com/MikaelMayer/hyde-build-tool/issues",
+  "author": "Mikaël Mayer <mikael.mayer@polytechnique.org>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/RaviChugh/Sketch-n-Sketch.git"
+    "url": "https://github.com/MikaelMayer/hyde-build-tool.git"
   },
   "dependencies": {
     "sketch-n-sketch": "^1.1.3"
@@ -29,6 +30,7 @@
   "files": [
     "bin/generate.js",
     "README.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "CONTRIBUTING.md"
   ]
 }
