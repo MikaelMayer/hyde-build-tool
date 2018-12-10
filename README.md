@@ -21,7 +21,7 @@ In combination with [Editor][editor], the following workflow makes it very easy 
 
 ## Installation guide
 
-npm install -g hyde-build-tool
+    npm install -g hyde-build-tool
 
 ## Quick start: Markdown to HTML
 
