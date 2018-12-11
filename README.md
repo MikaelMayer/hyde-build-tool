@@ -19,11 +19,13 @@ In combination with [Editor][editor], the following workflow makes it very easy 
 - [Editor][editor] automatically or interactively replicates the changes in the browser to the generated website.
 - Hyde automatically or interactively back-propagates these changes to the sources.
 
-## Installation guide
+## Installation
 
     npm install -g hyde-build-tool
 
-## Quick start: Markdown to HTML
+This installs the executable `hyde` and the synonym `hbt`.
+
+## Quick start: Reversible Markdown to HTML
 
 In a blank folder, we'll create the following structure.
 
@@ -40,19 +42,18 @@ In `src/a.txt`, write the following content:
 In hydefile, write the following task (if no task is specified, `all` will be called)
 
     all =
-      fs.read "a.md"
-      |> Maybe.map (
-        String.markdown >> Html.parseViaEval
-        >> (\x -> <html><head></head><body>@x</body></html>)
-        >> valToHTMLSource
-        >> Write "b.html")
-      |> Maybe.withDefault (Error "file not found")
+      fs.read "src/a.md"
+      |> Maybe.map (\content ->
+        """<html><head></head><body>@(String.markdown content)</body></html>"""
+        |> Write "b.html")
+      |> Maybe.withDefault (Error "file src/a.md not found")
 
 Open a command line and run:
 
     hyde --watch
 
 You can now modify either `src/a.md` or `b.html`, and see the changes to be back-propagated.
+To witness the interaction Hyde provides in case of ambiguity, just insert "new text" and a newline right after `<body>` in `b.html`
 
 ## Caution
 
@@ -65,8 +66,10 @@ In a folder containing a file `hydefile`:
 
 * `hyde` performs once the forward pipeline computation and writes the output files.
 * `hyde --backward` performs once the forward pipeline computation, compare with the existing outputs, and writes the *input* files.
-  It might ask a question if it finds ambiguity. To auto-resolve ambiguities, just add the "--autosync" option.
+  It might ask a question if it finds ambiguity.
+  To auto-resolve ambiguities, just add the "--autosync" option.
 * `hyde --watch` watches the inputs and the outputs, propagating one to the other.
+  To auto-resolve ambiguities, just add the "--autosync" option.
 * `hyde --watch --forward` watches the inputs and updates the outputs only.
 * `hyde resolve` or `hyde resolve _`computes the pipeline and displays the top-level list of tasks.
 * `hyde resolve module` or `hyde resolve module._` displays all the tasks that are under `module`

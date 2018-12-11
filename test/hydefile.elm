@@ -6,9 +6,7 @@ module = {
 
 all =
   fs.read "src/a.md"
-  |> Maybe.map (
-    String.markdown >> Html.parseViaEval
-    >> (\x -> <html><head></head><body>@x</body></html>)
-    >> valToHTMLSource
-    >> Write "b.html")
-  |> Maybe.withDefault (Error "file not found")
+  |> Maybe.map (\content ->
+    """<html><head></head><body>@(String.markdown content)</body></html>"""
+    |> Write "b.html")
+  |> Maybe.withDefault (Error "file src/a.md not found")

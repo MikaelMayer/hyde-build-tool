@@ -14,8 +14,16 @@
   ("capitalize", Regex.replace "^[A-Z]" (\m -> upcase m.match))
   ] ++ __CurrentEnv__
 
--- Convert pipe operators to Leo's syntax
-(jekyllify) = Regex.replace """ \|[^\|]""" (always "|>")
+-- Convert pipe and different operators to Leo's syntax
+(jekyllify) = Regex.replace """ \|([^\|])|!=""" (\m -> case m.match of
+  "!=" -> "/="
+  _ -> "|>" + nth m.group 1)
+
+rawMultiline content = 
+   String.q3 + Regex.replace String.q3 (always "@(\"\\\"\\\"\\\"\")") content + String.q3
+
+controlflowtags = Regex.replace """\{%\s*if\b((?:(?!%\}.)*)%\}([\s\S]*?)\{%\s*endif\s*%\}""" (\{submatches=[cond, content]} ->
+  "{{ if " + cont + " then " + rawMultiline content + " else \"\" }}")
 
 -- The regexp used to extract the front matter
 (frontmatterregex) = """^---([\s\S]*?\r?\n)---\r?\n([\s\S]*)$"""
@@ -67,7 +75,6 @@
 -- main task
 park =
   fs.listdir "."
-  |> Debug.log "directory content"
   |> List.filter (\x -> fs.isfile x &&
     Regex.matchIn """^.*\.(html|md)$""" x)
   |> List.map interpret
