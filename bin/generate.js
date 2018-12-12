@@ -462,9 +462,9 @@ if(watch) {
     doWatch(filesToWrite, valFilesToWrite);
   }
   if(backward) {
-    doUpdate(false, false, false, continuation);
+    doUpdate(false, false, continuation);
   } else {
-    continuation(false, false, false);
+    continuation(false, false);
   }
   
   

@@ -79,4 +79,15 @@ park =
     Regex.matchIn """^.*\.(html|md)$""" x)
   |> List.map interpret
 
+build = park
 all = park
+
+{-
+TODO: https://jekyllrb.com/docs/step-by-step/01-setup/
+- Convert tags to control flow
+-}
+
+serve = let _ = Debug.log "hyde serve not implemented yet" in
+  -- let _ =  __jsEval__ """require("editor")""" 
+  []
+
