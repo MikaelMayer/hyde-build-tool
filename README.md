@@ -15,7 +15,7 @@ Hyde can be useful to:
 In combination with [Editor][editor], the following workflow makes it very easy to modify statically generated websites.
 
 - Hyde generates a website statically from sources
-- [Editor][editor] display the generated generated website in the Browser
+- [Editor][editor] displays the generated generated website in the Browser
 - [Editor][editor] automatically or interactively replicates the changes in the browser to the generated website.
 - Hyde automatically or interactively back-propagates these changes to the sources.
 
@@ -30,7 +30,7 @@ This installs the executable `hyde` and the synonym `hbt`.
 In a blank folder, we'll create the following structure.
 
     src/a.md
-    src/hydefile
+    hydefile
     b.html
 
 In `src/a.txt`, write the following content:
@@ -39,7 +39,7 @@ In `src/a.txt`, write the following content:
     This is *a.md*.
     [^world]: The world is the planet Earth and all life upon it.
 
-In hydefile, write the following task (if no task is specified, `all` will be called)
+In `hydefile`, write the following task (if no task is specified, `all` will be called)
 
     all =
       fs.read "src/a.md"
@@ -50,11 +50,21 @@ In hydefile, write the following task (if no task is specified, `all` will be ca
 
 Open a command line and run:
 
-    hyde --watch
+    hyde --watch --input=src
 
 You can now modify either `src/a.md` or `b.html`, and see the changes to be back-propagated.
-To witness the interaction Hyde provides in case of ambiguity, just insert "new text" and a newline right after `<body>` in `b.html`
+To witness the interaction Hyde provides in case of ambiguity, just insert "new text" and a newline right after `<body>` in `b.html`.  
+If we had not named our task "all", we would have written the name after `--input=src`
 
+### Quick start: launch [Editor][editor] to modify `b.html`
+
+Hyde can automatically launch [Editor][editor] for you if you installed Editor globally.
+Just add the parameter `--serve` or `--serve=.` to the command above, i.e.:
+
+    hyde --watch --input=src --serve
+
+You can now enjoy visually editing `b.html` by pointing your browser at http://127.0.0.1:3000/b.html?edit=true
+  
 ## Caution
 
 When back-propagating changes, Hyde does not only modify the source files, it can actually modify the build file... This can be sneaky. However, with proper care, you should be fine.
