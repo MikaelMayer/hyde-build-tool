@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const exec = require("child_process").exec
 
 args = process.argv.slice(2);
 endParamIndex = args.findIndex(elem => !elem.startsWith("-"));
@@ -11,7 +12,9 @@ function existsParam(x) {
 function getParam(x, defaultValue) {
   var param = params.find(elem => elem.startsWith(x));
   if(typeof param !== "undefined") {
-    return param.substring(x.length + 1);
+    var returnValue = param.substring(x.length + 1);
+    if(returnValue == "") return defaultValue;
+    return returnValue;
   } else {
     return defaultValue;
   }
@@ -27,7 +30,7 @@ function getTask(x, defaultValue) {
 
 if(existsParam("--help") || existsParam("-h")) {
   console.log(`Syntax:
-hyde [--backward] [--watch [--input=dir] [--forward]] [--autosync] task
+hyde [--backward] [--watch [--input=dir] [--forward]] [--autosync] [--serve=dir] task
 
 Executes the task command (arbitrary Elm program) after interpreting the file "hydefile" or "hydefile.elm" in scope.
 
@@ -38,6 +41,7 @@ Executes the task command (arbitrary Elm program) after interpreting the file "h
                 If -f, --forward is set, the generation will not happen backward.
   -a, --autosync  : If an ambiguity is found, choose the most likely solution.
   --input=dir     : The directory from which to listen to changes in inputs. Default: .
+  --serve=dir     : If set, launches the reversible Editor http server at the given directory.
 
 Exploring the build:
 
@@ -51,6 +55,11 @@ var autosync   = existsParam("--autosync") || existsParam("-a");
 const forward  = existsParam("--forward")  || existsParam("-f");
 const backward = existsParam("--backward") || existsParam("-b");
 const inputDir = getParam("--input", ".");
+const serveDir = getParam("--serve", ".");
+if(serveDir && existsParam("--serve")) {
+  exec('editor', {cwd: serveDir}).unref();
+  console.log("If installed, editor is launched at http://127.0.0.1:3000");
+}
 if(notparams.length == 0) {
   var task = "all";
 }
