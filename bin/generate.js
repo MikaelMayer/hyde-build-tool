@@ -9,6 +9,9 @@ notparams = endParamIndex == -1 ? [] : args.slice(endParamIndex);
 function existsParam(x) {
   return typeof params.find(elem => elem == x) !== "undefined";
 }
+function existsPrefixParam(x) {
+  return typeof params.find(elem => elem.startsWith(x)) !== "undefined";
+}
 function getParam(x, defaultValue) {
   var param = params.find(elem => elem.startsWith(x));
   if(typeof param !== "undefined") {
@@ -42,6 +45,7 @@ Executes the task command (arbitrary Elm program) after interpreting the file "h
   -a, --autosync  : If an ambiguity is found, choose the most likely solution.
   --input=dir     : The directory from which to listen to changes in inputs. Default: .
   --serve=dir     : If set, launches the reversible Editor http server at the given directory.
+                    if the directory is the parent directory, --serve='../'
 
 Exploring the build:
 
@@ -56,7 +60,7 @@ const forward  = existsParam("--forward")  || existsParam("-f");
 const backward = existsParam("--backward") || existsParam("-b");
 const inputDir = getParam("--input", ".");
 const serveDir = getParam("--serve", ".");
-if(serveDir && existsParam("--serve")) {
+if(serveDir && existsPrefixParam("--serve")) {
   exec('editor', {cwd: serveDir}).unref();
   console.log("If installed, editor is launched at http://127.0.0.1:3000");
 }
