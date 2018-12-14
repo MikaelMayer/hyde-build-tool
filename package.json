@@ -21,7 +21,7 @@
     "url": "https://github.com/MikaelMayer/hyde-build-tool.git"
   },
   "dependencies": {
-    "sketch-n-sketch": "^1.1.7"
+    "sketch-n-sketch": "^1.1.8"
   },
   "bin": {
     "hyde": "bin/generate.js",
