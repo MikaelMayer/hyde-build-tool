@@ -33,7 +33,7 @@ function getTask(x, defaultValue) {
 
 if(existsParam("--help") || existsParam("-h")) {
   console.log(`Syntax:
-hyde [--backward] [--watch [--forward]] [--autosync] [--serve[=dir]] task
+hyde [--backward] [--watch [--forward]] [--autosync] [--serve[=dir] [--autosave=true/false] [--question=true/false] [--edit=true/false]] task
 
 Executes the task command (arbitrary Elm program) after interpreting the file "hydefile" or "hydefile.elm" in scope.
 
@@ -45,7 +45,11 @@ Executes the task command (arbitrary Elm program) after interpreting the file "h
   -a, --autosync  : If an ambiguity is found, choose the most likely solution.
   --serve[=dir]   : If set, launches the reversible Editor http server at the given directory.
                     if the directory is the parent directory, --serve='../'
-                    Furthermore, activate the --watch option
+                    Furthermore, activates the --watch option
+                    If set, the following Editor options can be set:
+                    --autosave (default true)
+                    --edit (default true)
+                    --question (default true)
 
 Exploring the build:
 
@@ -60,7 +64,11 @@ const forward  = existsParam("--forward")  || existsParam("-f");
 const backward = existsParam("--backward") || existsParam("-b");
 const serveDir = getParam("--serve", ".");
 if(serveDir && existsPrefixParam("--serve")) {
-  require("http-server-editor")({path:serveDir});
+  var options = {path:serveDir};
+  options["autosave"] = getParam("--autosave", "true") == "true";
+  options["edit"] = getParam("--edit", "true") == "true";
+  options["question"] = getParam("--question", "true") == "true";
+  require("http-server-editor")(options);
 }
 if(existsPrefixParam("--serve")) {
   watch = true;
