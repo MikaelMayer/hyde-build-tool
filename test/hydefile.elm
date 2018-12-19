@@ -5,8 +5,8 @@ module = {
 }
 
 all =
-  fs.read "src/a.md"
+  fs.read "a.md"
   |> Maybe.map (\content ->
     """<html><head></head><body>@(String.markdown content)</body></html>"""
     |> Write "b.html")
-  |> Maybe.withDefault (Error "file src/a.md not found")
+  |> Maybe.withDefault (Error "file a.md not found")

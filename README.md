@@ -29,11 +29,11 @@ This installs the executable `hyde` and the synonym `hbt`.
 
 In a blank folder, we'll create the following structure.
 
-    src/a.md
     hydefile
+    a.md
     b.html
 
-In `src/a.txt`, write the following content:
+In `a.txt`, write the following content:
 
     # Hello [world](https://en.wikipedia.org/wiki/World)[^world]
     This is *a.md*.
@@ -42,33 +42,41 @@ In `src/a.txt`, write the following content:
 In `hydefile`, write the following task (if no task is specified, `all` will be called)
 
     all =
-      fs.read "src/a.md"
+      fs.read "a.md"
       |> Maybe.map (\content ->
         """<html><head></head><body>@(String.markdown content)</body></html>"""
         |> Write "b.html")
-      |> Maybe.withDefault (Error "file src/a.md not found")
+      |> Maybe.withDefault (Error "file a.md not found")
 
 Open a command line and run:
 
-    hyde --watch --input=src
+    hyde --watch
 
-You can now modify either `src/a.md` or `b.html`, and see the changes to be back-propagated.
+You can now modify either `a.md` or `b.html`, and see the changes to be back-propagated.
 To witness the interaction Hyde provides in case of ambiguity, just insert "new text" and a newline right after `<body>` in `b.html`.  
-If we had not named our task "all", we would have written the name after `--input=src`
 
 ### Quick start: launch [Editor][editor] to modify `b.html`
 
-Hyde can automatically launch [Editor][editor] for you if you installed Editor globally.
-Just add the parameter `--serve` or `--serve=.` to the command above, i.e.:
+Hyde can automatically launch [Editor][editor].
+The parameter `--serve` both watches the files and launch Editor in the current or given directory:
 
-    hyde --watch --input=src --serve
+    hyde --serve
 
-You can now enjoy visually editing `b.html` by pointing your browser at http://127.0.0.1:3000/b.html?edit=true
+You can now enjoy visually editing `b.html` by pointing your browser at http://127.0.0.1:3000/b.html
   
 ## Caution
 
-When back-propagating changes, Hyde does not only modify the source files, it can actually modify the build file... This can be sneaky. However, with proper care, you should be fine.
-If you want to avoid that, make sure to prefix parts you don't want to be modified with `Update.expressionFreeze` (allow variables to change but not the constants) or `Update.freeze` (fail if modifications are back-propagated to the argument).
+When back-propagating changes, Hyde does not only modify the source files, it can actually modify the `hydefile`... This can be sneaky. However, with proper care, you should be fine.
+If you want to avoid that, make sure to prefix parts you don't want to be modified with `Update.expressionFreeze` (allows variables to change but not the constants) or `Update.freeze` (fails if modifications are back-propagated to the argument).
+
+## Content of the `hydefile` or the `hydefile.elm`
+
+A `hydefile` consist of top-level Elm definitions, some of which may be tasks.
+
+If a function is not a task, its name should be in parentheses.
+
+Tasks must return a `List (Write name content | Error message) | Write name content | Error message`.
+Type safety is not enforced (yet).
 
 ## List of commands
 
@@ -80,12 +88,12 @@ In a folder containing a file `hydefile`:
   To auto-resolve ambiguities, just add the "--autosync" option.
 * `hyde --watch` watches the inputs and the outputs, propagating one to the other.
   To auto-resolve ambiguities, just add the "--autosync" option.
-* `hyde --watch --forward` watches the inputs and updates the outputs only.
-* `hyde resolve` or `hyde resolve _`computes the pipeline and displays the top-level list of tasks.
+* `hyde --watch --forward` only watches the inputs and updates the outputs.
+* `hyde resolve` or `hyde resolve _`displays the top-level list of tasks.
 * `hyde resolve module` or `hyde resolve module._` displays all the tasks that are under `module`
 * `hyde resolve m_` displays all the tasks that start with `m`
-* `hyde resolve moduel.sub_` displays all the tasks in `module` that start with `sub`
-
+* `hyde resolve module.sub_` displays all the tasks in `module` that start with `sub`
+* `hyde inspect [task]` displays the input files and folders and output files of the task (if omitted, 'all' is the task).
 
 
 [editor]: https://github.com/MikaelMayer/Editor

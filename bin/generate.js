@@ -33,7 +33,7 @@ function getTask(x, defaultValue) {
 
 if(existsParam("--help") || existsParam("-h")) {
   console.log(`Syntax:
-hyde [--backward] [--watch [--input=dir] [--forward]] [--autosync] [--serve=dir] task
+hyde [--backward] [--watch [--forward]] [--autosync] [--serve[=dir]] task
 
 Executes the task command (arbitrary Elm program) after interpreting the file "hydefile" or "hydefile.elm" in scope.
 
@@ -43,9 +43,9 @@ Executes the task command (arbitrary Elm program) after interpreting the file "h
                 Else it regenerates the websites and listens to changes.
                 If -f, --forward is set, the generation will not happen backward.
   -a, --autosync  : If an ambiguity is found, choose the most likely solution.
-  --input=dir     : The directory from which to listen to changes in inputs. Default: .
-  --serve=dir     : If set, launches the reversible Editor http server at the given directory.
+  --serve[=dir]   : If set, launches the reversible Editor http server at the given directory.
                     if the directory is the parent directory, --serve='../'
+                    Furthermore, activate the --watch option
 
 Exploring the build:
 
@@ -54,15 +54,16 @@ Exploring the build:
   hyde resolve module.submodule._ : List the available tasks inside module's submodule`);
   return;
 }
-const watch    = existsParam("--watch")    || existsParam("-w");
+var watch      = existsParam("--watch")    || existsParam("-w");
 var autosync   = existsParam("--autosync") || existsParam("-a");
 const forward  = existsParam("--forward")  || existsParam("-f");
 const backward = existsParam("--backward") || existsParam("-b");
-const inputDir = getParam("--input", ".");
 const serveDir = getParam("--serve", ".");
 if(serveDir && existsPrefixParam("--serve")) {
-  exec('editor', {cwd: serveDir}).unref();
-  console.log("If installed, editor is launched at http://127.0.0.1:3000");
+  require("http-server-editor")({path:serveDir});
+}
+if(existsPrefixParam("--serve")) {
+  watch = true;
 }
 if(notparams.length == 0) {
   var task = "all";
@@ -76,12 +77,21 @@ const fs = require("fs")
 const sns = require("sketch-n-sketch");
 
 var bootstrappedSource = `
--- Input: listTasks   True/False if the list of tasks should be displayed
--- Input: sublevel    Under which submodule should we list tasks
--- Input: task        The task to execute
+-- Input: listTasks         True/False if the list of tasks should be displayed
+-- Input: sublevel          Under which submodule should we list tasks
+-- Input: task              The task to execute
+-- Input: recordFileRead    A callback on every read file's name
+-- Input: recordFolderList  A callback on every read folder's name
 -- Output: List (Write filename filecontent | Err errormessage)
 
-(fs) = nodejs.delayed fileOperations
+(fs) = nodejs.delayedFS { nodejs.nodeFS |
+        read name =
+          let _ = recordFileRead name in
+          nodejs.nodeFS.read name,
+        listdir name =
+          let _ = recordFolderList name in
+          nodejs.nodeFS.listdir name
+        } fileOperations
 initEnv = __CurrentEnv__
 
 fs.read("hydefile.elm")
@@ -126,7 +136,12 @@ if(notparams.length >= 1 && notparams[0] == "resolve") {
       filterStr = " starting with " + prefix;
     }
   }
-  var valResult = sns.objEnv.string.evaluate({willwrite:false, fileOperations:[], listTasks: true, sublevel: sublevel})(bootstrappedSource);
+  var filesToWatch = [];   // Useless for resolve
+  var foldersToWatch = []; // Useless for resolve
+  var valResult = sns.objEnv.string.evaluate({willwrite:false, fileOperations:[], listTasks: true, sublevel: sublevel,
+    recordFileRead: name => { filesToWatch.push(name); return 0 },
+    recordFolderList: name => { foldersToWatch.push(name); return 0 },
+    })(bootstrappedSource);
   var result = sns.process(valResult)(sns.valToNative);
   if(result.ctor == "Ok") {
     var tasks = Object.keys(result._0);
@@ -145,18 +160,54 @@ if(notparams.length >= 1 && notparams[0] == "resolve") {
   return;
 }
 
+if(notparams.length >= 1 && notparams[0] == "inspect") {
+  task = notparams.slice(1).join(" ");
+  if(task == "") task = "all";
+  var filesToWatch = [];
+  var foldersToWatch = [];
+  var [filesToWrite, filesToWriteVal, filesToWatch, foldersToWatch] = computeForward(false);
+  filesToWatch = filesToWatch.filter(name => name != "hydefile.elm" && name != "hydefile");
+  if(filesToWatch.length > 0)  console.log("Input files:");
+  else console.log("No input files");
+  for(var i in filesToWatch) {
+    console.log("  " + filesToWatch[i]);
+  }
+  if(foldersToWatch.length > 0) console.log("Input folders:");
+  for(var i in foldersToWatch) {
+    console.log("  " + foldersToWatch[i]);
+  }
+  if(filesToWrite.length > 0) console.log("Output files:");
+  else console.log("No output files");
+  for(var i in filesToWrite) {
+    var fw = filesToWrite[i];
+    if(fw["$d_ctor"] == "Write") {
+      var {_1: name, _2: content} = fw.args;
+      console.log("  " + name);
+    }
+    if(fw["$d_ctor"] == "Error") {
+      var {_1: msg} = fw.args;
+      console.log("Error: " + msg);
+    }
+  }
+  return;
+}
+
 // Returns the set of files to be written and its representation as a Val
 function computeForward(willwrite) {
   if(typeof willwrite == "undefined") willwrite = true;
-  var valResult = sns.objEnv.string.evaluate({willwrite:willwrite, fileOperations:[], listTasks: false, task: task})(bootstrappedSource);
+  var filesToWatch = [];
+  var foldersToWatch = [];
+  var valResult = sns.objEnv.string.evaluate({willwrite:willwrite, fileOperations:[], listTasks: false, task: task,
+    recordFileRead: name => { filesToWatch.push(name); return 0 },
+    recordFolderList: name => { foldersToWatch.push(name); return 0 } })(bootstrappedSource);
   var result = sns.process(valResult)(sns.valToNative);
 
   if(result.ctor == "Ok") {
     var filesToWrite = result._0;
-    return [filesToWrite, valResult._0];
+    return [filesToWrite, valResult._0, filesToWatch, foldersToWatch];
   } else {
     console.log("error while evaluating", result._0)
-    return [false, false];
+    return [false, false, [], []];
   }
 }
 
@@ -176,9 +227,9 @@ function writeFiles(filesToWrite) {
 }
 
 function computeAndWrite(willwrite) {
-  var [filesToWrite, valFilesToWrite] = computeForward();
+  var [filesToWrite, valFilesToWrite, filesToWatch] = computeForward();
   if(filesToWrite) writeFiles(filesToWrite);
-  return [filesToWrite, valFilesToWrite];
+  return [filesToWrite, valFilesToWrite, filesToWatch];
 }
 
 if(!watch && !backward) {
@@ -271,51 +322,38 @@ function getNewOutput(filesToWrite) {
   return [newFilesToWrite, hasChanged];
 }
 
-function doUpdate(filesToWrite, valFilesToWrite, callback) {
+function doUpdate(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch, callback) {
   if(typeof callback == "undefined") {
     console.log("doUpdate should have a callback");
     return;
   }
-  [filesToWrite, filesToWriteVal] = filesToWrite ? [filesToWrite, valFilesToWrite] : computeForward();
-  if(!filesToWrite) return callback(false, false, false);
+  [filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch] =
+    filesToWrite ? [filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch] : computeForward();
+  if(!filesToWrite) return callback(false, false, [], []);
   var [newFilesToWrite, hasChanged] = getNewOutput(filesToWrite);
   if(!hasChanged) {
     console.log("No modifications found.");
     if(!watch) {
       console.log("Done.")
     }
-    return callback(filesToWrite, filesToWriteVal);
+    return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
   }
   var newFilesToWriteVal = sns.nativeToVal(newFilesToWrite);
-  var resSolutions = sns.objEnv.string.updateWithOld({willwrite:false, fileOperations: [], listTasks: false, task: task})(bootstrappedSource)(filesToWriteVal)(newFilesToWriteVal);
+  var resSolutions = sns.objEnv.string.updateWithOld({willwrite:false, fileOperations: [], listTasks: false, task: task,
+    recordFileRead: name => 0,
+    recordFolderList: name => 0})(bootstrappedSource)(filesToWriteVal)(newFilesToWriteVal);
   console.log("finished to update");
   if(resSolutions.ctor == "Err") {
     console.log("Error while updating: " + resSolutions._0);
-    return callback(filesToWrite, filesToWriteVal);
+    return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
   }
   var solutions = resSolutions._0;
   if(!sns.lazyList.nonEmpty(solutions)) {
     console.log("Error while updating, solution array is empty");
-    return callback(filesToWrite, filesToWriteVal);
+    return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
   }
   var {_0: newEnv, _1: updatedBootstrappedSource} = sns.lazyList.head(solutions);
   var headOperations = newEnv.fileOperations;
-  /*function maybeAddGeneratorDiff(operations, oldSource, newSource) {
-    if(newSource != oldSource) { // server file itself modified from the update method
-      var d =
-        sns.process(sns.objEnv.string.evaluate({x: oldSource, y: newSource})(`__diff__ x y`))(sns.valToNative)
-      var diffssource = 
-        d.ctor == "Ok" ? d._0 ? d._0.args ? d._0.args._1 ? d._0.args._1.args ? d._0.args._1.args._1 ? d._0.args._1.args._1 :
-          false : false : false : false : false : false;
-
-      operations.unshift(
-        {"$t_ctor": "Tuple2",
-         _1: serverFile,
-         _2: {"$d_ctor": "Write",
-         args: {_1: oldSource, _2: newSource, _3: diffssource}}
-         });
-    }
-  }*/
   if(bootstrappedSource != updatedBootstrappedSource) {
     console.log("Warning: Cannot update the bootstrapped source of Hyde. Got ", updatedBootstrappedSource);
   }  
@@ -326,7 +364,7 @@ function doUpdate(filesToWrite, valFilesToWrite, callback) {
   if(autosync || sns.lazyList.isEmpty(tailSolutions)) {
     console.log((autosync ? "--autosync not checking for ambiguities" : "No ambiguity found ") + "-- Applying the transformations");
     [a, b] = applyOperations(headOperations);
-    return callback(a, b);
+    return callback(a, b, inputFilesToWatch, inputFoldersToWatch);
   } else {
     var solutions = [headOperations];
     console.log("Ambiguity found -- Computing the second solution");
@@ -382,17 +420,17 @@ function doUpdate(filesToWrite, valFilesToWrite, callback) {
           console.log("Overwriting output files with their original value...");
           [a, b] = computeAndWrite(true);
           rl.close();
-          callback(a, b);
+          callback(a, b, inputFilesToWatch, inputFoldersToWatch);
         } else if(line.toLowerCase() == "wait" || line.toLowerCase() == "w") {
           console.log("Waiting for other changes...");
           rl.close();
-          callback(filesToWrite, valFilesToWrite);
+          callback(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch);
         } else {
           var selectedSolution = solutions[parseInt(line) - 1];
           if(selectedSolution != null) {
             rl.close();
             [a, b] = applyOperations(selectedSolution);
-            callback(a, b);
+            callback(a, b, inputFilesToWatch, inputFoldersToWatch);
           } else {
             console.log("Input not recognized:" + line);
             showQuestion();
@@ -406,7 +444,7 @@ function doUpdate(filesToWrite, valFilesToWrite, callback) {
 }
 
 if(!watch && backward) { // !watch would have been sufficient because here, watch || backward
-  doUpdate(false, false, () => {});
+  doUpdate(false, false, [], [], () => {});
   return;
 }
 
@@ -422,32 +460,34 @@ function unwatchEverything() {
   watchers = [];
 }
 
-function doWatch(filesToWrite, valFilesToWrite) {
+function doWatch(filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch) {
   if(!filesToWrite) return;
+  var outputFileWatcherCallback = 
+    ((filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch) => (eventType, filename) => {
+        if(eventType == "change") {
+          if(changeTimer) {
+            clearTimeout(changeTimer);
+          }
+          changeTimer =
+            setTimeout(((filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch) => () => {
+              changeTimer = false;
+              unwatchEverything();
+              doUpdate(filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch, doWatch);
+            })(filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch), 500); // Time for all changes to be recorded
+        }
+    })(filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch)
+  
   if(!forward) {
-    for(var i = 0; i < filesToWrite.length; i++) {
+    for(var i in filesToWrite) {
       var action = filesToWrite[i];
       if(action["$d_ctor"] == "Write") {
         var {_1: name, _2: content} = action.args;  
-        var watcher =
-          fs.watch(name, ((filesToWrite, valFilesToWrite) => (eventType, filename) => {
-              if(eventType == "change") {
-                if(changeTimer) {
-                  clearTimeout(changeTimer);
-                }
-                changeTimer =
-                  setTimeout(((filesToWrite, valFilesToWrite) => () => {
-                    changeTimer = false;
-                    unwatchEverything();
-                    doUpdate(filesToWrite, valFilesToWrite, doWatch);
-                  })(filesToWrite, valFilesToWrite), 500); // Time for all changes to be recorded
-              }
-          })(filesToWrite, valFilesToWrite));
+        var watcher = fs.watch(name, outputFileWatcherCallback);
         watchers.push(watcher);
       }
     }
   }
-  watchers.push(fs.watch(inputDir, {recursive: true}, (eventType, generateElmScript) => {
+  var inputFileWatcherCallback = (eventType, generateElmScript) => {
     if(changeTimer) {
       clearTimeout(changeTimer);
     }
@@ -455,29 +495,50 @@ function doWatch(filesToWrite, valFilesToWrite) {
       setTimeout(() => {
         changeTimer = false;
         unwatchEverything();
-        var [filesToWrite, valFilesToWrite] = computeAndWrite();
-        doWatch(filesToWrite, valFilesToWrite);
+        var [filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch] = computeAndWrite();
+        doWatch(filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch);
       }, 500); // Time for all changes to be recorded
-    
-  }));
-  console.log("Watching for changes on inputs or outputs...")
+  }
+  
+  for(var i in filesToWatch) {
+    var name = filesToWatch[i];
+    if(fs.existsSync(name)) {
+      var watcher = fs.watch(name, inputFileWatcherCallback);
+      watchers.push(watcher);
+    }
+  }
+  for(var i in foldersToWatch) {
+    var name = foldersToWatch[i];
+    if(fs.existsSync(name)) {
+      var watcher = fs.watch(name, inputFileWatcherCallback);
+      watchers.push(watcher);
+    }
+  }
+  if(!forward) {
+    console.log("Watching for changes on inputs or outputs...")
+  } else {
+    console.log("Watching for inputs to change...")
+  }
 }
 
 
 if(watch) {
   var filesToWrite;
   var valFilesToWrite;
-  var continuation = (filesToWrite, valFilesToWrite) => {
-    var [filesToWrite, valFilesToWrite] = filesToWrite ? [filesToWrite, valFilesToWrite] : computeForward();
+  var inputFilesToWatch;
+  var inputFoldersToWatch;
+  var continuation = (filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch) => {
+    var [filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch] =
+      filesToWrite ? [filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch] : computeForward();
     if((!backward) && filesToWrite) { // Do the initial file write to make sure everything is consistent.
       writeFiles(filesToWrite);
     }
-    doWatch(filesToWrite, valFilesToWrite);
+    doWatch(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch);
   }
   if(backward) {
-    doUpdate(false, false, continuation);
+    doUpdate(false, false, [], [], continuation);
   } else {
-    continuation(false, false);
+    continuation(false, false, [], []);
   }
   
   
