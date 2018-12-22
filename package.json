@@ -1,6 +1,6 @@
 {
   "name": "hyde-build-tool",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "The Hyde Build Tool is an experimental reversible build tool, that it, it can modify the input sources",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
