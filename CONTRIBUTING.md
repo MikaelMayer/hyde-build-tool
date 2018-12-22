@@ -15,6 +15,8 @@ npm update sketch-n-sketch
 npm update http-server-editor
 ```
 
+If necessary, commit these changes.
+
 Then, to publish to npm and Github:
 
 ```
