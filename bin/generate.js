@@ -68,6 +68,7 @@ if(serveDir && existsPrefixParam("--serve")) {
   options["autosave"] = getParam("--autosave", "true") == "true";
   options["edit"] = getParam("--edit", "true") == "true";
   options["question"] = getParam("--question", "true") == "true";
+  options["openbrowser"] = true;
   require("http-server-editor")(options);
 }
 if(existsPrefixParam("--serve")) {
