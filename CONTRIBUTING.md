@@ -1,6 +1,13 @@
+## Contribution ideas
+
+First, make sure that you can run the test below.
+Then, it would be great to
+
+* Update Jekyll's hydefile inside test to be able to interpret a Jekyll site.
+
 ## Testing
 
-To test the build tool locally, for example in the test folder, run:
+To test the build tool locally, for example in the `test` folder, run:
 
     ../bin/generate.js
 
@@ -8,22 +15,9 @@ This is exactly like running `hyde` once it is installed
 
 ## Publishing
 
-Maybe first update sketch-n-sketch's and editor's version
+Run
 
-```
-npm update sketch-n-sketch
-npm update http-server-editor
-```
-
-If necessary, commit these changes.
-
-Then, to publish to npm and Github:
-
-```
-npm version patch
-npm publish
-git push origin master
-```
+  make publish
 
 ## TODO:
 
