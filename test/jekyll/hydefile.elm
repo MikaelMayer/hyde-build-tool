@@ -1,35 +1,49 @@
-(downcase) = Regex.replace "[A-Z]" (\m ->
+(downcase): String -> String
+(downcase) string =
+  Regex.replace "[A-Z]" (\m ->
     case m.match of 
       "A" -> "a"; "B" -> "b"; "C" -> "c"; "D" -> "d"; "E" -> "e"; "F" -> "f"; "G" -> "g"; "H" -> "h"; "I" -> "i"; "J" -> "j"; "K" -> "k"; "L" -> "l"; "M" -> "m"; "N" -> "n"; "O" -> "o"; "P" -> "p"; "Q" -> "q"; "R" -> "r"; "S" -> "s"; "T" -> "t"; "U" -> "u"; "V" -> "v"; "W" -> "w"; "X" -> "x"; "Y" -> "y"; "Z" -> "z"; _ -> m.match
-    )
+    ) string
 
-(upcase) = Regex.replace "[a-z]" (\m ->
+(upcase): String -> String
+(upcase) string =
+  Regex.replace "[a-z]" (\m ->
     case m.match of 
       "a" -> "A"; "b" -> "B"; "c" -> "C"; "d" -> "D"; "e" -> "E"; "f" -> "F"; "g" -> "G"; "h" -> "H"; "i" -> "I"; "j" -> "J"; "k" -> "K"; "l" -> "L"; "m" -> "M"; "n" -> "N"; "o" -> "O"; "p" -> "P"; "q" -> "Q"; "r" -> "R"; "s" -> "S"; "t" -> "T"; "u" -> "U"; "v" -> "V"; "w" -> "W"; "x" -> "X"; "y" -> "Y"; "z" -> "Z"; _ -> m.match
-    )
-    
+    ) string
+  
 (jekylllib) = [
   ("|", \a b -> b a),
   ("downcase", downcase),
   ("capitalize", Regex.replace "^[A-Z]" (\m -> upcase m.match))
   ] ++ __CurrentEnv__
 
--- Convert pipe and different operators to Leo's syntax
-(jekyllify) = Regex.replace """ \|([^\|])|!=""" (\m -> case m.match of
-  "!=" -> "/="
-  _ -> "|>" + nth m.group 1)
+-- Converts the pipe operator `|` and different operators to Leo's syntax
+(jekyllify) program =
+  Regex.replace """(?:\|\|)|(?:\|(?!\|))|(?:!=)""" (\m -> case m.match of
+    "!=" -> "/="
+    "||" -> "||"
+    "|" -> "|>"
+    x -> x
+  ) program
 
+-- creates a multiline string literal in Leo out of the given string content
+rawMultiline: String -> String
 rawMultiline content = 
    String.q3 + Regex.replace String.q3 (always "@(\"\\\"\\\"\\\"\")") content + String.q3
 
+-- NOT IMPLEMENTED YET: Try to replace Jekyll's control flow with Elm's control flow.
 controlflowtags = Regex.replace """\{%\s*if\b((?:(?!%\}.)*)%\}([\s\S]*?)\{%\s*endif\s*%\}""" (\{submatches=[cond, content]} ->
   "{{ if " + cont + " then " + rawMultiline content + " else \"\" }}")
 
 -- The regexp used to extract the front matter
+(frontmatterregex): Regex
 (frontmatterregex) = """^---([\s\S]*?\r?\n)---\r?\n([\s\S]*)$"""
 
 -- Converts the front matter to a Leo's object
-(frontmattercode) text = case Regex.extract frontmatterregex text of
+(frontmattercode): String -> Object
+(frontmattercode) text =
+  case Regex.extract frontmatterregex text of
   Just (code :: _) ->
     let body = Regex.replace """(\r?\n\s*)([\w_]+)(\s*):(\s*)(.*?)(\s*)(?=\r?\n)""" (\{submatches=[nl,name,sp,sp2,d,sp3]} ->
       let content = case Regex.extract "^(\\d+)$" d of
@@ -43,22 +57,29 @@ controlflowtags = Regex.replace """\{%\s*if\b((?:(?!%\}.)*)%\}([\s\S]*?)\{%\s*en
   _ -> {}
 
 -- Removes the front matter from a source file
-(removefrontmatter) = Regex.replace frontmatterregex (\{submatches=[front,back]} -> back)
+(removefrontmatter): String -> String
+(removefrontmatter) string =
+  Regex.replace frontmatterregex (\{submatches=[front,back]} -> back) string
   
-(applyObjects) furtherEnv =
+-- Replaces interpolated strings like {{code}} by evaluating the jekyllified code and replacing it with the result
+(applyObjects): Env -> String -> String
+(applyObjects) furtherEnv src =
   Regex.replace """\{\{(.*)\}\}""" (\{submatches=[code]} ->
     case __evaluate__ (furtherEnv ++ jekylllib) (jekyllify code) of
-      Ok x -> """@x"""
-      Err msg -> """(error: @msg)"""
-  )
+      Ok x ->
+        """@x""" -- Converts non-strings to strings
+      Err msg ->
+        """(error: @msg)"""
+  ) src
 
 -- Jekyll interpretation of the file
-(interpret) file = 
-  let (newName, isMd) = case Regex.extract """^(.*)\.(html|md)$""" file of
+(interpret): String -> (Write Filename String | Error String)
+(interpret) filename = 
+  let (newName, isMd) = case Regex.extract """^(.*)\.(html|md)$""" filename of
     Just [name, ext] -> ("_site/" + name + ".html", ext == "md")
-    _ -> (file, False)
+    _ -> (filename, False)
   in
-  fs.read file
+  fs.read filename
   |> Maybe.map (\source ->
     let fm = frontmattercode source in
     let (source, contentEnv) = case fm of
@@ -70,9 +91,10 @@ controlflowtags = Regex.replace """\{%\s*if\b((?:(?!%\}.)*)%\}([\s\S]*?)\{%\s*en
     removefrontmatter source
     |> applyObjects ([("page", fm)] ++ contentEnv)
     |> Write newName)
-  |> Maybe.withDefaultLazy (\_ -> Error <| "file " ++ file ++ " not found")
+  |> Maybe.withDefaultLazy (\_ -> Error <| "file " ++ filename ++ " not found")
 
--- main task
+-- main task with a pun on words
+park: List (Write Filename String | Error String)
 park =
   fs.listdir "."
   |> List.filter (\x -> fs.isfile x &&
@@ -83,11 +105,6 @@ build = park
 all = park
 
 {-
-TODO: https://jekyllrb.com/docs/step-by-step/01-setup/
+TODO: Continue with https://jekyllrb.com/docs/step-by-step/01-setup/
 - Convert tags to control flow
 -}
-
-serve = let _ = Debug.log "hyde serve not implemented yet" in
-  -- let _ =  __jsEval__ """require("editor")""" 
-  []
-
