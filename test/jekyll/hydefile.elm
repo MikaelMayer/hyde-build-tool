@@ -19,7 +19,7 @@
   ] ++ __CurrentEnv__
 
 -- Converts the pipe operator `|` and different operators to Leo's syntax
-(jekyllify) program =
+(unjekyllify) program =
   Regex.replace """(?:\|\|)|(?:\|(?!\|))|(?:!=)""" (\m -> case m.match of
     "!=" -> "/="
     "||" -> "||"
@@ -64,13 +64,14 @@ controlflowtags = Regex.replace """\{%\s*if\b((?:(?!%\}.)*)%\}([\s\S]*?)\{%\s*en
 -- Replaces interpolated strings like {{code}} by evaluating the jekyllified code and replacing it with the result
 (applyObjects): Env -> String -> String
 (applyObjects) furtherEnv src =
-  Regex.replace """\{\{(.*)\}\}""" (\{submatches=[code]} ->
-    case __evaluate__ (furtherEnv ++ jekylllib) (jekyllify code) of
+  src
+  |> Regex.replace """\{\{(.*)\}\}""" (\{submatches=[code]} ->
+    case __evaluate__ (furtherEnv ++ jekylllib) (unjekyllify code) of
       Ok x ->
         """@x""" -- Converts non-strings to strings
       Err msg ->
         """(error: @msg)"""
-  ) src
+    )
 
 -- Jekyll interpretation of the file
 (interpret): String -> (Write Filename String | Error String)
@@ -82,29 +83,26 @@ controlflowtags = Regex.replace """\{%\s*if\b((?:(?!%\}.)*)%\}([\s\S]*?)\{%\s*en
   fs.read filename
   |> Maybe.map (\source ->
     let fm = frontmattercode source in
+    let sourceWithoutFrontMatter = removefrontmatter source in
     let (source, contentEnv) = case fm of
       {layout} ->
-        (fs.read """_layouts/@(layout).html""" |>
-        Maybe.withDefaultLazy (\_ -> """_layouts/@(layout).html not found """), [("content", (if isMd then String.markdown else identity) <| applyObjects [("page", fm)] <| removefrontmatter source)])
-      _ -> (removefrontmatter source, [])
+        ( fs.read """_layouts/@(layout).html"""
+          |> Maybe.withDefaultLazy (\_ -> """_layouts/@(layout).html not found """)
+        , [("content",
+             sourceWithoutFrontMatter
+             |> applyObjects [("page", fm)]
+             |> (if isMd then String.markdown else identity))])
+      _ -> (sourceWithoutFrontMatter, [])
     in
     removefrontmatter source
     |> applyObjects ([("page", fm)] ++ contentEnv)
     |> Write newName)
   |> Maybe.withDefaultLazy (\_ -> Error <| "file " ++ filename ++ " not found")
 
--- main task with a pun on words
-park: List (Write Filename String | Error String)
-park =
+-- main task
+all: List (Write Filename String | Error String)
+all =
   fs.listdir "."
   |> List.filter (\x -> fs.isfile x &&
     Regex.matchIn """^.*\.(html|md)$""" x)
   |> List.map interpret
-
-build = park
-all = park
-
-{-
-TODO: Continue with https://jekyllrb.com/docs/step-by-step/01-setup/
-- Convert tags to control flow
--}
