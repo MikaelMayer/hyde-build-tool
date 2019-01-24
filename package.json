@@ -16,6 +16,7 @@
   "homepage": "https://github.com/MikaelMayer/hyde-build-tool",
   "bugs": "https://github.com/MikaelMayer/hyde-build-tool/issues",
   "author": "Mikaël Mayer <mikael.mayer@polytechnique.org>",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/MikaelMayer/hyde-build-tool.git"
