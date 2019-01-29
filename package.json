@@ -16,14 +16,14 @@
   "homepage": "https://github.com/MikaelMayer/hyde-build-tool",
   "bugs": "https://github.com/MikaelMayer/hyde-build-tool/issues",
   "author": "Mikaël Mayer <mikael.mayer@polytechnique.org>",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/MikaelMayer/hyde-build-tool.git"
   },
   "dependencies": {
-    "http-server-editor": "^1.0.50",
-    "sketch-n-sketch": "^1.2.9"
+    "http-server-editor": "^1.0.52",
+    "sketch-n-sketch": "^1.2.10"
   },
   "bin": {
     "hyde": "bin/generate.js",
