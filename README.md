@@ -41,7 +41,7 @@ In `a.txt`, write the following content:
 
 In `hydefile`, write the following task (if no task is specified, `all` will be called)
 
-    all =
+    all () =
       fs.read "a.md"
       |> Maybe.map (\content ->
         """<html><head></head><body>@(String.markdown content)</body></html>"""
