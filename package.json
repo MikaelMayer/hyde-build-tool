@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "http-server-editor": "^1.0.52",
-    "sketch-n-sketch": "^1.2.10"
+    "sketch-n-sketch": "^1.2.11"
   },
   "bin": {
     "hyde": "bin/generate.js",

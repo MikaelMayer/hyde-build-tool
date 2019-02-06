@@ -4,7 +4,7 @@ module = {
   toast = 2
 }
 
-all =
+all () =
   fs.read "a.md"
   |> Maybe.map (\content ->
     """<html><head></head><body>@(String.markdown content)</body></html>"""

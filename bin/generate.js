@@ -112,7 +112,7 @@ fs.read("hydefile.elm")
       |> __evaluate__ (("willwrite", False)::initEnv)
       |> Result.withDefaultMapError error
     else
-    source + Update.freeze "\\n\\n" + task
+    source + Update.freeze "\\n\\n let t = " + task + " in if typeof t == 'function' then t () else t"
     |> __evaluate__ (("willwrite", willwrite)::initEnv)
     |> Result.withDefaultMapError error
     |> case of
@@ -215,24 +215,33 @@ function computeForward(willwrite) {
     var filesToWrite = result._0;
     return [filesToWrite, valResult._0, filesToWatch, foldersToWatch];
   } else {
-    console.log("error while evaluating", result._0)
+    console.log("[hyde] error while evaluating", result._0)
     return [false, false, [], []];
   }
 }
 
 function writeFiles(filesToWrite) {
+  var written = 0;
+  var errors = 0;
   for(var i = 0; i < filesToWrite.length; i++) {
     var fw = filesToWrite[i];
     if(fw["$d_ctor"] == "Write") {
+      written++;
       var {_1: name, _2: content} = fw.args;
       fs.writeFileSync(name, content, "utf8");
     } else if(fw["$d_ctor"] == "Error") {
-      console.log(fw.args._1);
+      errors++;
+      console.log("[hyde]" + fw.args._1);
     } else {
-      console.log("Unrecognized Geditor command. Only 'Write name content' and 'Error msg' are suppported at this moment. ", fw);
+      console.log("[hyde] Unrecognized command. Only 'Write name content' and 'Error msg' are suppported at this moment. ", fw);
     }
   }
-  console.log("Written " + filesToWrite.length + " file" + (filesToWrite.length > 1 ? "s" : ""));
+  if(written) {
+    console.log("[hyde] Written " + filesToWrite.length + " file" + (filesToWrite.length > 1 ? "s" : ""));
+  }
+  if(errors) {
+    console.log("[hyde] " + errors + " errors found.");
+  }
 }
 
 function computeAndWrite(willwrite) {
@@ -336,68 +345,72 @@ function doUpdate(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFolders
     console.log("doUpdate should have a callback");
     return;
   }
+  if(!filesToWrite) {
+    console.log("Recomputing the pipeline");
+  }
   [filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch] =
     filesToWrite ? [filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch] : computeForward();
   if(!filesToWrite) return callback(false, false, [], []);
   var [newFilesToWrite, hasChanged] = getNewOutput(filesToWrite);
   if(!hasChanged) {
-    console.log("No modifications found.");
+    console.log("[hyde] No modifications found.");
     if(!watch) {
-      console.log("Done.")
+      console.log("[hyde] Done.")
     }
     return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
   }
+  console.log("[hyde] Computing output value...")
   var newFilesToWriteVal = sns.nativeToVal(newFilesToWrite);
-  var resSolutions = sns.objEnv.string.updateWithOld({willwrite:false, fileOperations: [], listTasks: false, task: task,
+  console.log("[hyde] Updating pipeline...")
+  var resSolutions = sns.objEnv.string.updateWithOld({willwrite:false,       fileOperations: [], listTasks: false, task: task,
     recordFileRead: name => 0,
     recordFolderList: name => 0})(bootstrappedSource)(filesToWriteVal)(newFilesToWriteVal);
-  console.log("finished to update");
   if(resSolutions.ctor == "Err") {
-    console.log("Error while updating: " + resSolutions._0);
+    console.log("[hyde] Error while updating: " + resSolutions._0);
     return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
   }
   var solutions = resSolutions._0;
   if(!sns.lazyList.nonEmpty(solutions)) {
-    console.log("Error while updating, solution array is empty");
+    console.log("[hyde] Error while updating, solution array is empty");
     return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
   }
   var {_0: newEnv, _1: updatedBootstrappedSource} = sns.lazyList.head(solutions);
   var headOperations = newEnv.fileOperations;
   if(bootstrappedSource != updatedBootstrappedSource) {
-    console.log("Warning: Cannot update the bootstrapped source of Hyde. Got ", updatedBootstrappedSource);
+    console.log("[hyde] Warning: Cannot update the bootstrapped source of Hyde. Got ", updatedBootstrappedSource);
   }  
   // maybeAddGeneratorDiff(headOperations, bootstrappedSource, updatedBootstrappedSource);
   // Check for ambiguity.
-  console.log("Checking for ambiguity");
+  console.log("[hyde] Checking for ambiguity");
   var tailSolutions = autosync ? {ctor: "Nil"} : sns.lazyList.tail(solutions);
   if(autosync || sns.lazyList.isEmpty(tailSolutions)) {
-    console.log((autosync ? "--autosync not checking for ambiguities" : "No ambiguity found ") + "-- Applying the transformations");
+    console.log("[hyde] " + (autosync ? "--autosync not checking for ambiguities" : "No ambiguity found ") + "-- Applying the transformations");
     [a, b] = applyOperations(headOperations);
     return callback(a, b, inputFilesToWatch, inputFoldersToWatch);
   } else {
     var solutions = [headOperations];
-    console.log("Ambiguity found -- Computing the second solution");
+    console.log("[hyde] Ambiguity found -- Computing the second solution");
     var solutionsRemaining = tailSolutions;
     var oneMoreSolution = () => {
       var {_0: alternativeEnv, _1: alternativeBootstrappedSource} = sns.lazyList.head(solutionsRemaining);
       var alternativeOperations = alternativeEnv.fileOperations;
       if(bootstrappedSource != alternativeBootstrappedSource) {
-        console.log("Warning: Cannot update the bootstrapped source of Hyde. Got ", alternativeBootstrappedSource);
+        console.log("[hyde] Warning: Cannot update the bootstrapped source of Hyde. Got ", alternativeBootstrappedSource);
       } 
       //maybeAddGeneratorDiff(alternativeOperations, source, alternativeSolution);
       solutions.push(alternativeOperations);
     }
     oneMoreSolution();
     
-    console.log("Ambiguity detected");
+    console.log("[hyde] Ambiguity detected");
     
     function askSolutions() {
       function showQuestion() {
         for(var i = 0; i < solutions.length; i++) {
-          console.log(`Solution #${i+1}:`, fileOperationSummary(solutions[i]));
+          console.log(`[hyde] Solution #${i+1}:`, fileOperationSummary(solutions[i]));
         }
         
-        console.log(`Which solution number should I apply? Other possibilities:${solutionsRemaining !== false ? "\n  Find [m]ore solutions?": ''}${!autosync ? "\n  Enable [a]utosync?" : ''}
+        console.log(`[hyde] Which solution number should I apply? Other possibilities:${solutionsRemaining !== false ? "\n  Find [m]ore solutions?": ''}${!autosync ? "\n  Enable [a]utosync?" : ''}
   [w]ait for other changes?
   [r]evert changes made to outputs?`);
       }
@@ -411,27 +424,27 @@ function doUpdate(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFolders
       rl.on('line', function(line){
         if((line.toLowerCase() == "autosync" || line.toLowerCase() == "a" || line.toLowerCase() == "auto") && !autosync) {
           autosync = true;
-          console.log("Autosync activated. Next time, use the --autosync option to prevent questionning.");
-          console.log("Choosing the first solution for this question.");
+          console.log("[hyde] Autosync activated. Next time, use the --autosync option to prevent questionning.");
+          console.log("[hyde] Choosing the first solution for this question.");
           line = "1";
         }
         if((line.toLowerCase() == "more" || line.toLowerCase() == "m") && solutionsRemaining !== false) {
           solutionsRemaining = sns.lazyList.tail(solutionsRemaining);
           if(sns.lazyList.isEmpty(solutionsRemaining)) {
-            console.log("No other solution found")
+            console.log("[hyde] No other solution found")
             solutionsRemaining = false;
           } else {
-            console.log("one more solution found");
+            console.log("[hyde] one more solution found");
             oneMoreSolution();
           }
           showQuestion();
         } else if(line.toLowerCase() == "revert" || line.toLowerCase() == "r") {
-          console.log("Overwriting output files with their original value...");
+          console.log("[hyde] Overwriting output files with their original value...");
           [a, b] = computeAndWrite(true);
           rl.close();
           callback(a, b, inputFilesToWatch, inputFoldersToWatch);
         } else if(line.toLowerCase() == "wait" || line.toLowerCase() == "w") {
-          console.log("Waiting for other changes...");
+          console.log("[hyde] Waiting for other changes...");
           rl.close();
           callback(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch);
         } else {
@@ -441,7 +454,7 @@ function doUpdate(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFolders
             [a, b] = applyOperations(selectedSolution);
             callback(a, b, inputFilesToWatch, inputFoldersToWatch);
           } else {
-            console.log("Input not recognized:" + line);
+            console.log("[hyde] Input not recognized:" + line);
             showQuestion();
           }
         }
@@ -462,7 +475,7 @@ var changeTimer = false;
 var watchers = [];
 
 function unwatchEverything() {
-  console.log("Paused watching changes to files");
+  console.log("[hyde] Paused watching changes to files");
   for(var i = 0; i < watchers.length; i++) {
     watchers[i].close();
   }
@@ -524,9 +537,9 @@ function doWatch(filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch) {
     }
   }
   if(!forward) {
-    console.log("Watching for changes on inputs or outputs...")
+    console.log("[hyde] Watching for changes on inputs or outputs...")
   } else {
-    console.log("Watching for inputs to change...")
+    console.log("[hyde] Watching for inputs to change...")
   }
 }
 
