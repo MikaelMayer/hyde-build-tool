@@ -54,7 +54,7 @@ controlflowtags = Regex.replace """\{%\s*if\b((?:(?!%\}.)*)%\}([\s\S]*?)\{%\s*en
       Err msg ->
         """(error: @msg)"""
     )
-  |> Regex.replace """\{% include \s*(.*)\s* %\}""" (\{submatches=[filename]} ->
+  |> Regex.replace """\{% include \s*(.*?)\s* %\}""" (\{submatches=[filename]} ->
        fs.read """_includes/@filename"""
        |> Maybe.map (applyObjects furtherEnv)
        |> Maybe.withDefault ""
