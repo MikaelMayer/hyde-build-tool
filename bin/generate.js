@@ -112,13 +112,15 @@ fs.read("hydefile.elm")
       |> __evaluate__ (("willwrite", False)::initEnv)
       |> Result.withDefaultMapError error
     else
-    source + Update.freeze "\\n\\n let t = " + task + " in if typeof t == 'function' then t () else t"
+    source + Update.freeze "\\n\\n let t = " + task + "\\n    t = if typeof t == 'function' then t () else t\\n    t = if typeof t === 'list' then t else [t]\\n in t"
     |> __evaluate__ (("willwrite", willwrite)::initEnv)
     |> Result.withDefaultMapError error
     |> case of
       {} as x -> [x] -- In case there is just one file write.
       x -> x
   Nothing -> error "No 'hydefile' or 'hydefile.elm' found. Please create one."`
+
+pushResultOn = array => name => { array.push(name); return 0 }
 
 if(notparams.length >= 1 && notparams[0] == "resolve") {
   var sublevel = "";
@@ -145,11 +147,9 @@ if(notparams.length >= 1 && notparams[0] == "resolve") {
       filterStr = " starting with " + prefix;
     }
   }
-  var filesToWatch = [];   // Useless for resolve
-  var foldersToWatch = []; // Useless for resolve
   var valResult = sns.objEnv.string.evaluate({willwrite:false, fileOperations:[], listTasks: true, sublevel: sublevel,
-    recordFileRead: name => { filesToWatch.push(name); return 0 },
-    recordFolderList: name => { foldersToWatch.push(name); return 0 },
+    recordFileRead: name => 0,
+    recordFolderList: name => 0,
     })(bootstrappedSource);
   var result = sns.process(valResult)(sns.valToNative);
   if(result.ctor == "Ok") {
@@ -207,8 +207,8 @@ function computeForward(willwrite) {
   var filesToWatch = [];
   var foldersToWatch = [];
   var valResult = sns.objEnv.string.evaluate({willwrite:willwrite, fileOperations:[], listTasks: false, task: task,
-    recordFileRead: name => { filesToWatch.push(name); return 0 },
-    recordFolderList: name => { foldersToWatch.push(name); return 0 } })(bootstrappedSource);
+    recordFileRead: pushResultOn(filesToWatch),
+    recordFolderList: pushResultOn(foldersToWatch) })(bootstrappedSource);
   var result = sns.process(valResult)(sns.valToNative);
 
   if(result.ctor == "Ok") {
