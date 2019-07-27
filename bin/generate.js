@@ -113,7 +113,7 @@ fs.read("hydefile.leo")
       |> __evaluate__ (("willwrite", False)::initEnv)
       |> Result.withDefaultMapError error
     else
-    source + Update.freeze "\\n\\nlet t = " + task + "\\n    t = if typeof t == 'function' then t () else t\\n    t = if typeof t === 'list' then t else [t]\\n in t"
+    source + Update.freeze "\\n\\nlet t = " + task + "\\n    t = if typeof t == 'function' then t () else t\\n    t = if typeof t == 'list' then t else [t]\\n in t"
     |> __evaluate__ (("willwrite", willwrite)::initEnv)
     |> Result.withDefaultMapError error
     |> case of
