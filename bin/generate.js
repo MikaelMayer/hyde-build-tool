@@ -103,8 +103,9 @@ var bootstrappedSource = `
         } fileOperations
 initEnv = __CurrentEnv__
 
-fs.read("hydefile.elm")
+fs.read("hydefile.leo")
 |> Maybe.orElse (fs.read "hydefile")
+|> Maybe.orElse (fs.read "hydefile.elm")
 |> case of
   Just source ->
     if listTasks then
