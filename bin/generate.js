@@ -148,7 +148,7 @@ if(notparams.length >= 1 && notparams[0] == "resolve") {
       filterStr = " starting with " + prefix;
     }
   }
-  var valResult = sns.objEnv.string.evaluate({willwrite:false, fileOperations:[], listTasks: true, sublevel: sublevel,
+  var valResult = sns.objEnv.string.evaluateWithoutCache({willwrite:false, fileOperations:[], listTasks: true, sublevel: sublevel,
     recordFileRead: name => 0,
     recordFolderList: name => 0,
     })(bootstrappedSource);
@@ -175,7 +175,7 @@ if(notparams.length >= 1 && notparams[0] == "inspect") {
   if(task == "") task = "all";
   var filesToWatch = [];
   var foldersToWatch = [];
-  var [filesToWrite, filesToWriteVal, filesToWatch, foldersToWatch] = computeForward(false);
+  var [filesToWrite, outValEnvCache, filesToWatch, foldersToWatch] = computeForward(false);
   filesToWatch = filesToWatch.filter(name => name != "hydefile.elm" && name != "hydefile");
   if(filesToWatch.length > 0)  console.log("Input files:");
   else console.log("No input files");
@@ -207,14 +207,14 @@ function computeForward(willwrite) {
   if(typeof willwrite == "undefined") willwrite = true;
   var filesToWatch = [];
   var foldersToWatch = [];
-  var valResult = sns.objEnv.string.evaluate({willwrite:willwrite, fileOperations:[], listTasks: false, task: task,
+  var resOutValEnvCache = sns.objEnv.string.evaluate({willwrite:willwrite, fileOperations:[], listTasks: false, task: task,
     recordFileRead: pushResultOn(filesToWatch),
     recordFolderList: pushResultOn(foldersToWatch) })(bootstrappedSource);
-  var result = sns.process(valResult)(sns.valToNative);
+  var result = sns.process(resOutValEnvCache)(outValEnvCache => sns.valToNative(sns.first(outValEnvCache)));
 
   if(result.ctor == "Ok") {
     var filesToWrite = result._0;
-    return [filesToWrite, valResult._0, filesToWatch, foldersToWatch];
+    return [filesToWrite, resOutValEnvCache._0, filesToWatch, foldersToWatch];
   } else {
     console.log("[hyde] error while evaluating", result._0)
     return [false, false, [], []];
@@ -246,9 +246,9 @@ function writeFiles(filesToWrite) {
 }
 
 function computeAndWrite(willwrite) {
-  var [filesToWrite, valFilesToWrite, filesToWatch] = computeForward();
+  var [filesToWrite, outValEnvCache, filesToWatch] = computeForward();
   if(filesToWrite) writeFiles(filesToWrite);
-  return [filesToWrite, valFilesToWrite, filesToWatch];
+  return [filesToWrite, outValEnvCache, filesToWatch];
 }
 
 if(!watch && !backward) {
@@ -341,7 +341,7 @@ function getNewOutput(filesToWrite) {
   return [newFilesToWrite, hasChanged];
 }
 
-function doUpdate(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch, callback) {
+function doUpdate(filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch, callback) {
   if(typeof callback == "undefined") {
     console.log("doUpdate should have a callback");
     return;
@@ -349,8 +349,8 @@ function doUpdate(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFolders
   if(!filesToWrite) {
     console.log("Recomputing the pipeline");
   }
-  [filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch] =
-    filesToWrite ? [filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch] : computeForward();
+  [filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch] =
+    filesToWrite ? [filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch] : computeForward();
   if(!filesToWrite) return callback(false, false, [], []);
   var [newFilesToWrite, hasChanged] = getNewOutput(filesToWrite);
   if(!hasChanged) {
@@ -358,22 +358,22 @@ function doUpdate(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFolders
     if(!watch) {
       console.log("[hyde] Done.")
     }
-    return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
+    return callback(filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch);
   }
   console.log("[hyde] Computing output value...")
   var newFilesToWriteVal = sns.nativeToVal(newFilesToWrite);
   console.log("[hyde] Updating pipeline...")
-  var resSolutions = sns.objEnv.string.updateWithOld({willwrite:false,       fileOperations: [], listTasks: false, task: task,
+  var resSolutions = sns.objEnv.string.update({willwrite:false,       fileOperations: [], listTasks: false, task: task,
     recordFileRead: name => 0,
-    recordFolderList: name => 0})(bootstrappedSource)(filesToWriteVal)(newFilesToWriteVal);
+    recordFolderList: name => 0})(bootstrappedSource)(outValEnvCache)(newFilesToWriteVal);
   if(resSolutions.ctor == "Err") {
     console.log("[hyde] Error while updating: " + resSolutions._0);
-    return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
+    return callback(filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch);
   }
   var solutions = resSolutions._0;
   if(!sns.lazyList.nonEmpty(solutions)) {
     console.log("[hyde] Error while updating, solution array is empty");
-    return callback(filesToWrite, filesToWriteVal, inputFilesToWatch, inputFoldersToWatch);
+    return callback(filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch);
   }
   var {_0: newEnv, _1: updatedBootstrappedSource} = sns.lazyList.head(solutions);
   var headOperations = newEnv.fileOperations;
@@ -547,16 +547,16 @@ function doWatch(filesToWrite, valFilesToWrite, filesToWatch, foldersToWatch) {
 
 if(watch) {
   var filesToWrite;
-  var valFilesToWrite;
+  var outValEnvCache;
   var inputFilesToWatch;
   var inputFoldersToWatch;
-  var continuation = (filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch) => {
-    var [filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch] =
-      filesToWrite ? [filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch] : computeForward();
+  var continuation = (filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch) => {
+    var [filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch] =
+      filesToWrite ? [filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch] : computeForward();
     if((!backward) && filesToWrite) { // Do the initial file write to make sure everything is consistent.
       writeFiles(filesToWrite);
     }
-    doWatch(filesToWrite, valFilesToWrite, inputFilesToWatch, inputFoldersToWatch);
+    doWatch(filesToWrite, outValEnvCache, inputFilesToWatch, inputFoldersToWatch);
   }
   if(backward) {
     doUpdate(false, false, [], [], continuation);
