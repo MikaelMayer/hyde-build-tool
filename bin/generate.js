@@ -103,6 +103,22 @@ var bootstrappedSource = `
         } fileOperations
 initEnv = __CurrentEnv__
 
+-- A Hyde plug-is a function that takes two arguments
+--   options (as a list, object or tuple)
+--   a list of Write
+-- Returns a list of Write
+plugin name =
+  fs.read (hyde_inDirectory ("hydefile-plugin-" + name + ".leo")) |>
+  Maybe.andThen (\\plugin_content ->
+    case __evaluate__ (("fs", hyde_fs)::("plugin", plugin)::preludeEnv) plugin_content of
+      Ok x -> Just x
+      Err msg -> 
+        let _ = Debug.log ("loading of plugin " + name + " failed:" + msg) () in
+        Nothing
+  ) |> Maybe.withDefaultLazy (\\_ ->
+   let _ = Debug.log ("plugin " + name + " not found") () in
+   \\options -> identity)
+
 fs.read("hydefile.leo")
 |> Maybe.orElse (fs.read "hydefile")
 |> Maybe.orElse (fs.read "hydefile.elm")
@@ -114,7 +130,7 @@ fs.read("hydefile.leo")
       |> Result.withDefaultMapError error
     else
     source + Update.freeze "\\n\\nlet t = " + task + "\\n    t = if typeof t == 'function' then t () else t\\n    t = if typeof t == 'list' then t else [t]\\n in t"
-    |> __evaluate__ (("willwrite", willwrite)::initEnv)
+    |> __evaluate__ (("willwrite", willwrite)::("plugin", plugin)::initEnv)
     |> Result.withDefaultMapError error
     |> case of
       {} as x -> [x] -- In case there is just one file write.
