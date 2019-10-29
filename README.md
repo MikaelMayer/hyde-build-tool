@@ -95,5 +95,15 @@ In a folder containing a file `hydefile`:
 * `hyde resolve module.sub_` displays all the tasks in `module` that start with `sub`
 * `hyde inspect [task]` displays the input files and folders and output files of the task (if omitted, 'all' is the task).
 
+# Plugins
+
+Since version 1.0.43, hyde support plugins.
+Plugins are files named "hyde-plugin-NAME.leo" that should be placed in the hydefile directory.
+Each file should evaluate to a function taking two arguments:
+
+- Options (e.g. a list or an object)
+- A list of Write like [Write fileName fileContent, Write fileName2 fileContent2]
+
+The function should then return a list of Write (usually the same files with a different content, but translation plug-ins can generate more files).
 
 [editor]: https://github.com/MikaelMayer/Editor
